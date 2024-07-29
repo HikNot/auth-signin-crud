@@ -35,7 +35,7 @@ create vite@latest
 устанавливаем все нужные пакеты
 
 ```
-npm i reac-bootstrap bootstrap react-router-dom
+npm i react-bootstrap bootstrap react-router-dom axios
 ```
 
 // Шаг 3 (Client)
