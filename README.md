@@ -435,7 +435,6 @@ import SignUpPage from './components/pages/SignUpPage';
 import axiosInstance, { setAccessToken } from './axiosInstance';
 import SignInPage from './components/pages/SignInPage';
 import ProtectedRoute from './components/hoc/ProtectedRoute';
-import WelcomePage from './components/pages/WelcomePage';
 import AccountPage from './components/pages/AccountPage';
 
 function App() {
@@ -510,10 +509,6 @@ function App() {
         {
           element: <ProtectedRoute isAllowed={!user} redirectPath='/' />,
           children: [
-            {
-              path: '/',
-              element: <WelcomePage />,
-            },
             {
               path: '/signup',
               element: <SignUpPage handleSignUp={handleSignUp} />,
