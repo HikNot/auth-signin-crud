@@ -11,8 +11,7 @@
 npm i
 ```
 
-
-// Шаг 0 
+// Шаг 0
 
 в корне проекта в терминал прописываем
 
@@ -51,6 +50,8 @@ cd client/
 в клиенте создаем папку src -> components -> pages, ui, hoc и файл Layout.jsx
 
 в hoc создаем файл ProtectedRoute.jsx и Loader.jsx
+
+ProtectedRouter.jsx
 
 ```
 import { Navigate, Outlet } from 'react-router-dom';
@@ -168,7 +169,7 @@ export default function Layout({ user, handleLogout }) {
 
 // Шаг 4 (Client)
 
-создаем MainPage.jsx  и пишем
+создаем MainPage.jsx и пишем
 
 ```
 import React, { useEffect, useState } from 'react';
@@ -592,6 +593,74 @@ export default function PostPage() {
 
 ```
 
+ChatPage.jsx
+
+```
+import React, { useEffect, useRef, useState } from 'react';
+import Container from 'react-bootstrap/Container';
+import ChatList from '../ui/ChatList';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
+import ChatComponent from '../ui/ChatComponent';
+
+export default function ChatPage({user}) {
+  const [online, setOnline] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const soketRef = useRef(null);
+
+  useEffect(() => {
+    const soket = new WebSocket('http://localhost:3000');
+    soketRef.current = soket;
+    soket.onopen = () => console.log('CONNECTED');
+    soket.onclose = () => console.log('DISCONNECTED');
+    soket.onerror = () => console.log('ERROR');
+    soket.onmessage = (event) => {
+      const action = JSON.parse(event.data);
+      const { type, payload } = action;
+      switch (type) {
+        case 'SET_USERS':
+          setOnline(payload);
+          break;
+        case 'NEW_MESSAGES':
+          setMessages(payload);
+          break;
+        case 'ADD_MESSAGE':
+          setMessages((prev) => [...prev, payload]);
+          break;
+        default:
+          break;
+      }
+    };
+    return () => {
+      soketRef.current.close();
+    };
+  }, []);
+
+  const sendNewMessage = (text) => {
+    const action = {
+      type: 'NEW_MESSAGE',
+      payload: {
+        text,
+      },
+    };
+    soketRef.current.send(JSON.stringify(action));
+  };
+
+  return (
+    <Container>
+      <Row>
+        <Col className="mt-3" xs={2}>
+          <ChatList online={online} />
+        </Col>
+        <Col className="mt-3" xs={10}>
+          <ChatComponent user={user} sendNewMessage={sendNewMessage} messages={messages} />
+        </Col>
+      </Row>
+    </Container>
+  );
+}
+
+```
 
 в ui создаем файлы Modal.jsx, NavBar.jsx, PostCard.jsx, Spiner.jsx, CommentsCard.jsx
 
@@ -676,6 +745,9 @@ export default function NavBar({ user, handleLogout }) {
                 <NavLink to="/my-cards">My cards</NavLink>
               </Navbar.Text>
               <Navbar.Text className="me-3">
+                <NavLink to="/chat">Chat</NavLink>
+              </Navbar.Text>
+              <Navbar.Text className="me-3">
                 <NavLink to="/" onClick={handleLogout}>
                   Logout
                 </NavLink>
@@ -699,6 +771,7 @@ export default function NavBar({ user, handleLogout }) {
     </Navbar>
   );
 }
+
 
 ```
 
@@ -817,6 +890,116 @@ export default function CommentsCard(comment) {
 
 ```
 
+ChatComponent.jsx
+
+```
+import React from 'react';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
+import ChatMessage from './ChatMessage';
+import Form from 'react-bootstrap/Form';
+import { IoSend } from 'react-icons/io5';
+import ChatInput from './ChatInput';
+
+export default function ChatComponent({ user, messages, sendNewMessage }) {
+  return (
+    <>
+      <Row>
+        <Col xs={12}>
+          {messages.map((message) => (
+            <ChatMessage user={user} message={message} key={message.id} />
+          ))}
+        </Col>
+        <Col>
+          <ChatInput sendNewMessage={sendNewMessage} />
+        </Col>
+      </Row>
+    </>
+  );
+}
+
+```
+
+ChatInput.jsx
+
+```
+import React from 'react';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
+import Form from 'react-bootstrap/Form';
+import { IoSend } from 'react-icons/io5';
+
+export default function ChatInput({ sendNewMessage }) {
+  return (
+    <Form onSubmit={(e) => {
+        e.preventDefault();
+        const form = e.target
+        const text = new FormData(form).get("text")
+        sendNewMessage(text)
+        form.reset()
+    }}>
+      <Row>
+        <Col className="mt-3" xs={9}>
+          <Form.Control name="text" type="text" placeholder="Enter your message" />
+        </Col>
+        <Col xs={3} style={{ marginTop: '1.25rem' }}>
+          <IoSend
+            style={{ cursor: 'pointer' }}
+            onClick={() => console.log('clicked')}
+          />
+        </Col>
+      </Row>
+    </Form>
+  );
+}
+
+```
+
+ChatList.jsx
+
+```
+import React from 'react';
+import ListGroup from 'react-bootstrap/ListGroup';
+
+export default function ChatList({ online }) {
+  console.log(online);
+
+  return (
+    <ListGroup>
+      {online.map((user) => (
+        <ListGroup.Item key={user.id}>{user.name}</ListGroup.Item>
+      ))}
+    </ListGroup>
+  );
+}
+
+```
+
+ChatMessage.jsx
+
+```
+import React from 'react';
+import Col from 'react-bootstrap/esm/Col';
+import Row from 'react-bootstrap/esm/Row';
+
+export default function ChatMessage({ user, message }) {
+  // console.log(messages[0].User.name);
+  console.log(message);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: user.id === message.userId ? 'flex-end' : 'flex-start',
+      }}
+    >
+      {message.body}&nbsp;&nbsp;<i>-{message.User?.name}</i>
+    </div>
+  );
+}
+
+```
+
 В App.jsx прописыаем
 
 ```
@@ -836,24 +1019,29 @@ import ProtectedRoute from './components/hoc/ProtectedRoute';
 import WelcomePage from './components/pages/WelcomePage';
 import AccountPage from './components/pages/AccountPage';
 import PostPage from './components/pages/PostPage';
+import ChatPage from './components/pages/ChatPage';
 
 function App() {
   const [user, setUser] = useState();
 
   useEffect(() => {
-    const time = setTimeout(() => axiosInstance
-    .get('/tokens/refresh')
-    .then((res) => {
-      const { user, accessToken } = res.data;
-      setUser(user);
-      setAccessToken(accessToken);
-    })
-    .catch(() => {
-      setUser(null);
-      setAccessToken('');
-    }), 1000)
-    
-    return () => clearTimeout(time)
+    const time = setTimeout(
+      () =>
+        axiosInstance
+          .get('/tokens/refresh')
+          .then((res) => {
+            const { user, accessToken } = res.data;
+            setUser(user);
+            setAccessToken(accessToken);
+          })
+          .catch(() => {
+            setUser(null);
+            setAccessToken('');
+          }),
+      1000,
+    );
+
+    return () => clearTimeout(time);
   }, []);
 
   const handleSignUp = async (e) => {
@@ -912,6 +1100,14 @@ function App() {
           ),
         },
         {
+          path: '/chat',
+          element: (
+            <ProtectedRoute isAllowed={!!user} redirectPath="/welcome">
+              <ChatPage user={user}/>
+            </ProtectedRoute>
+          ),
+        },
+        {
           path: '/:id',
           element: (
             <ProtectedRoute isAllowed={!!user} redirectPath="/welcome">
@@ -945,8 +1141,8 @@ function App() {
 
 export default App;
 
-
 ```
+
 в main.jsx
 
 ```
@@ -956,9 +1152,9 @@ import App from './App.jsx'
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+ // <React.StrictMode>
     <App />
-  </React.StrictMode>,
+ //  </React.StrictMode>,
 )
 
 ```
@@ -999,6 +1195,7 @@ cd server/
 ```
 npm i sequelize pg pg-hstore express bcrypt cookie-parser dotenv jsonwebtoken morgan
 ```
+
 ```
 npm i -D nodemon sequelize-cli
 ```
@@ -1088,6 +1285,7 @@ npx sequelize-cli init
 ```
 npx sequelize-cli model:create --name User --attributes name:string,email:string,hashpass:string
 ```
+
 по аналогии создаем столько моделей, сколько требует задание
 
 создаем файл для генирации сидов
@@ -1154,7 +1352,7 @@ class X extends Model {
   }
 ```
 
-// Для реализации лайков 
+// Для реализации лайков
 
 у модели лайк создаем поля userId, postId <br><br>
 
@@ -1192,7 +1390,6 @@ class Comment extends Model {
     }
   }
 ```
-
 
 в миграциях у юзера пишем
 
@@ -1372,7 +1569,83 @@ module.exports = {
 };
 ```
 
-создаем папку src и в ней configs, middlewares, router, utils, app.js и server.js
+### Для реалзицаии чата на web-soket`ах
+
+создаем таблицу Message с полями body, userId <br><br>
+
+в миграции пишем
+
+```
+'use strict';
+/** @type {import('sequelize-cli').Migration} */
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.createTable('Messages', {
+      id: {
+        allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
+        type: Sequelize.INTEGER
+      },
+      body: {
+        type: Sequelize.TEXT
+      },
+      userId: {
+        type: Sequelize.INTEGER,
+        references: {
+          model: 'Users',
+          key: 'id'
+        },
+        onDelete: 'CASCADE'
+      },
+      createdAt: {
+        allowNull: false,
+        type: Sequelize.DATE
+      },
+      updatedAt: {
+        allowNull: false,
+        type: Sequelize.DATE
+      }
+    });
+  },
+  async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable('Messages');
+  }
+};
+```
+
+в модели пишем
+
+```
+'use strict';
+const {
+  Model
+} = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  class Message extends Model {
+    /**
+     * Helper method for defining associations.
+     * This method is not a part of Sequelize lifecycle.
+     * The `models/index` file will call this method automatically.
+     */
+    static associate({User}) {
+      // define association here
+      this.belongsTo(User, {foreignKey: 'userId'})
+    }
+  }
+  Message.init({
+    body: DataTypes.TEXT,
+    userId: DataTypes.INTEGER
+  }, {
+    sequelize,
+    modelName: 'Message',
+  });
+  return Message;
+};
+```
+
+
+создаем папку src и в ней configs, middlewares, router, utils, ws, app.js и server.js
 
 в папке configs создаем cookieConfig.js и jwtConfig.js
 
@@ -1585,6 +1858,7 @@ postRouter
 module.exports = postRouter;
 
 ```
+
 tokensRouter.js
 
 ```
@@ -1721,7 +1995,6 @@ module.exports = commentRouter;
 
 ```
 
-
 в папке utils создаем файл generateTokens.js
 
 ```
@@ -1746,16 +2019,226 @@ function generateTokens(payload) {
 
 module.exports = generateTokens;
 ```
+
+в папке ws создаем файлы connection.js, upgrade.js, wsServer.js
+
+connection.js
+
+```
+const { Message, User } = require('../../db/models');
+
+const connections = new Map(); // in-memory DB
+
+const connectionCb = async (socket, request, user) => {
+  connections.set(user.id, { ws: socket, user });
+
+  connections.forEach(async (connection) => {
+    const { ws } = connection;
+    const allUsers = [...connections.values()].map(({ user: u }) => u);
+    
+    const action = {
+      type: 'SET_USERS',
+      payload: allUsers,
+    };
+    ws.send(JSON.stringify(action));
+  });
+  const allMessages = await Message.findAll({
+    include: User,
+  });
+  socket.send(JSON.stringify({ type: 'SET_MESSAGES', payload: allMessages }));
+
+  socket.on('close', () => {
+    connections.delete(user.id);
+    connections.forEach((connection) => {
+      const { ws } = connection;
+      const allUsers = [...connections.values()].map(({ user: u }) => u);
+      const action = {
+        type: 'SET_USERS',
+        payload: allUsers,
+      };
+      ws.send(JSON.stringify(action));
+    });
+  });
+
+  socket.on('error', () => {
+    connections.delete(user.id);
+    connections.forEach((connection) => {
+      const { ws } = connection;
+      const allUsers = [...connections.values()].map(({ user: u }) => u);
+      const action = {
+        type: 'SET_USERS',
+        payload: allUsers,
+      };
+      ws.send(JSON.stringify(action));
+    });
+  });
+
+  socket.on('message', async (message) => {
+    const actionFromFront = JSON.parse(message);
+    const { type, payload } = actionFromFront;
+    switch (type) {
+      case 'NEW_MESSAGE':
+        {
+          const newMessage = await Message.create({ body: payload.text, userId: user.id });
+          const newMessageWithUser = await Message.findOne({
+            where: { id: newMessage.id },
+            include: User,
+          });
+          const action = {
+            type: 'ADD_MESSAGE',
+            payload: newMessageWithUser,
+          };
+          connections.forEach((connection) => {
+            const { ws } = connection;
+            ws.send(JSON.stringify(action));
+          });
+        }
+        break;
+
+      default:
+        break;
+    }
+  });
+
+  //   const userId = request.session.user.id;
+
+  //   map.set(userId, { ws: socket, user: request.session.user });
+
+  //   function sendUsers(activeConnections) {
+  //     activeConnections.forEach(({ ws }) => {
+  //       ws.send(
+  //         JSON.stringify({
+  //           type: 'SET_USERS',
+  //           payload: [...map.values()].map(({ user }) => user),
+  //         }),
+  //       );
+  //     });
+  //   }
+
+  //   sendUsers(map);
+
+  //     const actionFromFront = JSON.parse(message);
+  //     const { type, payload } = actionFromFront;
+  //     switch (type) {
+  //       case SEND_MESSAGE:
+  //         Message.create({ text: payload, authorId: userId }).then(async (newMessage) => {
+  //           const newMessageWithAuthor = await Message.findOne({
+  //             where: { id: newMessage.id },
+  //             include: User,
+  //           });
+  //           map.forEach(({ ws }) => {
+  //             ws.send(
+  //               JSON.stringify({
+  //                 type: ADD_MESSAGE,
+  //                 payload: newMessageWithAuthor,
+  //               }),
+  //             );
+  //           });
+  //         });
+  //         break;
+
+  //       case DELETE_MESSAGE:
+  //         Message.findOne({ where: { id: payload } }).then(async (targetMessage) => {
+  //           if (targetMessage.authorId !== userId) return;
+  //           await Message.destroy({ where: { id: payload } });
+  //           map.forEach(({ ws }) => {
+  //             ws.send(
+  //               JSON.stringify({
+  //                 type: HIDE_MESSAGE,
+  //                 payload,
+  //               }),
+  //             );
+  //           });
+  //         });
+  //         break;
+
+  //       default:
+  //         break;
+  //     }
+  //     console.log(`Received message ${message} from user ${userId}`);
+  //   });
+
+  //   socket.on('close', () => {
+  //     map.delete(userId);
+  //     sendUsers(map);
+  //   });
+};
+
+module.exports = connectionCb;
+
+```
+
+upgrade.js
+
+```
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const wsServer = require('./wsServer');
+require('dotenv').config();
+
+const upgradeCb = (request, socket, head) => {
+  socket.on('error', (err) => {
+    console.log('Socket error:', err);
+  });
+
+  console.log('Parsing token from request...');
+  cookieParser()(request, {}, () => {
+    try {
+      const { refreshToken } = request.cookies;
+      const { user } = jwt.verify(
+        refreshToken,
+        process.env.REFRESH_TOKEN_SECRET,
+      );
+      if (!user) throw new Error('Нет юзера в куки');
+
+      console.log('JWT is parsed!');
+
+      socket.removeListener('error', (err) => {
+        console.log('Socket error:', err);
+      });
+
+      wsServer.handleUpgrade(request, socket, head, (ws) => {
+        wsServer.emit('connection', ws, request, user);
+      });
+    } catch (error) {
+      socket.write('HTTP/1.1 401 Unauthorized\n\n');
+      socket.destroy();
+    }
+  });
+};
+
+module.exports = upgradeCb;
+```
+
+wsServer.js
+
+```
+const { WebSocketServer } = require('ws');
+
+const wsServer = new WebSocketServer({
+    clientTracking: false,
+    noServer: true,
+  });
+
+  module.exports = wsServer;
+```
+
 в файле app.js
 
 ```
 const express = require('express');
 const morgan = require('morgan');
+const {createServer} = require('http');
 const cookieParser = require('cookie-parser');
 const userRouter = require('./router/userRouter');
 const postRouter = require('./router/postRouter');
 const authRouter = require('./router/authRouter');
 const tokenRouter = require('./router/tokensRouter');
+const likeRouter = require('./router/likeRouter');
+const commentRouter = require('./router/commentRouter');
+const upgradeCb = require('./ws/upgrade');
+const wsServer = require('./ws/wsServer');
+const connection = require('./ws/connection');
 
 const app = express();
 
@@ -1764,13 +2247,20 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/api/users', userRouter)
-app.use('/api/posts', postRouter)
-app.use('/api/auth', authRouter)
-app.use('/api/tokens', tokenRouter)
+app.use('/api/users', userRouter);
+app.use('/api/posts', postRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/tokens', tokenRouter);
+app.use('/api/likes', likeRouter);
+app.use('/api/comments', commentRouter)
 
+const server = createServer(app);
 
-module.exports = app;
+server.on('upgrade', upgradeCb)
+wsServer.on('connection', connection)
+
+module.exports = server;
+
 ```
 
 server.js
@@ -1793,6 +2283,7 @@ app.listen(PORT, () => {
 ```
 cd client/
 ```
+
 а в другом пишем
 
 ```
@@ -1830,20 +2321,39 @@ client--
                              |
                              > AccountPage.jsx
                              |
+                             > ChatPage.jsx
+                             |
                              > MainPage.jsx
                              |
-                             > SignUpPage.jsx
+                             > PostPage.jsx
                              |
                              > SignInPage.jsx
                              |
+                             > SignUpPage.jsx
+                             |
+                             > WelcomePage.jsx
+                             |
+                             
                        |
                        > ui
+                          |
+                          > ChatComponent.jsx
+                          |
+                          > ChatInput.jsx
+                          |
+                          > ChatList.jsx
+                          |
+                          > ChatMessage.jsx
+                          |
+                          > CommentsCard.jsx
                           |
                           > Modal.jsx
                           |
                           > NavBar.jsx
                           |
                           > PostCard.jsx
+                          |
+                          > Spinner.jsx
             |
             Layout.jsx
          |
@@ -1853,7 +2363,6 @@ client--
          |
          main.jsx
 ```
-
 
 ```
 server--
@@ -1894,6 +2403,14 @@ server--
                  |
                  > generateTokens.js
            |
+           > ws
+                 |
+                 > connection.js
+                 |
+                 > upgrade.js
+                 |
+                 > wsServer.js
+           |
            app.js
            |
            server.js
@@ -1905,7 +2422,5 @@ server--
        .gitignore
        |
        .sequelizerc
-       
+
 ```
-                 
-       
